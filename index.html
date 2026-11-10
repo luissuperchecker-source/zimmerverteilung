@@ -166,9 +166,9 @@ const KEY = 'zimmerverteilung-v1';
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const WISH_POINTS = [100, 60, 30];   // bester erfüllter Wunsch
-const NONE_PENALTY = -200;           // kein Wunsch erfüllt
+const NONE_PENALTY = -3000;          // kein Wunsch erfüllt – das soll praktisch nie passieren
 const EXTRA_POINTS = 5;              // jeder weitere erfüllte Wunsch
-const ALONE_PENALTY = -5000;         // ein Kind allein im Zimmer
+const ALONE_PENALTY = -10000;        // ein Kind allein im Zimmer
 
 let state = load() || { students: [], rooms: [], result: null };
 let selected = null;
@@ -354,7 +354,7 @@ function autoRooms(){
     if (!n) continue;
     const k = Math.ceil(n / size);
     for (let i = 0; i < k; i++) {
-      const cap = Math.floor(n / k) + (i < n % k ? 1 : 0);   // gleichmäßig verteilen
+      const cap = size;   // volle Bettenzahl – gibt der Verteilung Spielraum
       state.rooms.push({ id: uid(), name: `Zimmer ${nr++}`, cap, g: anyGender ? g : '' });
     }
   }
@@ -403,19 +403,32 @@ function optimize(){
   const G = S.map(s => s.g || ''), RG = R.map(r => r.g || '');
   const compat = (i, r) => !RG[r] || !G[i] || RG[r] === G[i];
 
+  // Punkte eines einzelnen Kindes
+  const kid = (a, i) => {
+    if (!hasW[i]) return 0;
+    const w = W[i], ri = a[i];
+    let best = -1, cnt = 0;
+    for (let k = 0; k < 3; k++) if (w[k] >= 0 && a[w[k]] === ri) { cnt++; if (best < 0) best = k; }
+    return best < 0 ? NONE_PENALTY : WISH_POINTS[best] + EXTRA_POINTS * (cnt - 1);
+  };
+  const roomPen = c => c === 1 ? ALONE_PENALTY : 0;   // niemand allein im Zimmer
   const score = a => {
     let t = 0;
-    for (let i = 0; i < n; i++) {
-      if (!hasW[i]) continue;
-      const w = W[i], ri = a[i];
-      let best = -1, cnt = 0;
-      for (let k = 0; k < 3; k++) if (w[k] >= 0 && a[w[k]] === ri) { cnt++; if (best < 0) best = k; }
-      t += best < 0 ? NONE_PENALTY : WISH_POINTS[best] + EXTRA_POINTS * (cnt - 1);
-    }
-    // Niemand soll allein in einem Zimmer sein
+    for (let i = 0; i < n; i++) t += kid(a, i);
     const cnt = new Array(nR).fill(0);
     for (let i = 0; i < n; i++) cnt[a[i]]++;
-    for (let r = 0; r < nR; r++) if (cnt[r] === 1) t += ALONE_PENALTY;
+    for (let r = 0; r < nR; r++) t += roomPen(cnt[r]);
+    return t;
+  };
+  // Wer wünscht sich wen? (damit nur betroffene Kinder neu gerechnet werden – viel schneller)
+  const fans = Array.from({ length: n }, () => []);
+  W.forEach((w, i) => w.forEach(x => { if (x >= 0 && !fans[x].includes(i)) fans[x].push(i); }));
+  const mark = new Int32Array(n); let stamp = 0;
+  const local = (a, i, j) => {           // Summe über i, j und alle, die sich i oder j wünschen
+    stamp++; let t = 0;
+    const add = k => { if (mark[k] !== stamp) { mark[k] = stamp; t += kid(a, k); } };
+    add(i); fans[i].forEach(add);
+    if (j >= 0) { add(j); fans[j].forEach(add); }
     return t;
   };
 
@@ -434,8 +447,48 @@ function optimize(){
     return { a, occ };
   };
 
+  // Änderung der Punkte, wenn Kind i in Zimmer r geht (j = Tauschpartner aus r, oder -1)
+  const tryMove = (a, occ, i, r, j) => {
+    const old = a[i];
+    let before = local(a, i, j), after;
+    if (j < 0) {
+      before += roomPen(occ[old]) + roomPen(occ[r]);
+      a[i] = r; occ[old]--; occ[r]++;
+      after = local(a, i, -1) + roomPen(occ[old]) + roomPen(occ[r]);
+    } else {
+      a[i] = r; a[j] = old;
+      after = local(a, i, j);
+    }
+    return after - before;
+  };
+  const undo = (a, occ, i, r, j, old) => {
+    if (j < 0) { a[i] = old; occ[r]--; occ[old]++; } else { a[i] = old; a[j] = r; }
+  };
+  const membersOf = (a, r) => { const m = []; for (let k = 0; k < n; k++) if (a[k] === r) m.push(k); return m; };
+
+  // Zum Schluss: alle möglichen Verschiebungen/Tausche durchprobieren, bis nichts mehr besser wird
+  const polish = (a, occ) => {
+    let improved = true, guard = 0;
+    while (improved && guard++ < 50) {
+      improved = false;
+      for (let i = 0; i < n; i++) for (let r = 0; r < nR; r++) {
+        const old = a[i];
+        if (r === old || !compat(i, r)) continue;
+        if (occ[r] < CAP[r]) {
+          if (tryMove(a, occ, i, r, -1) > 0) { improved = true; continue; }
+          undo(a, occ, i, r, -1, old);
+        }
+        for (const j of membersOf(a, r)) {
+          if (!compat(j, old)) continue;
+          if (tryMove(a, occ, i, r, j) > 0) { improved = true; break; }
+          undo(a, occ, i, r, j, old);
+        }
+      }
+    }
+  };
+
   let best = null, bestScore = -Infinity;
-  const RESTARTS = 14, ITERS = 6000 + n * 900;
+  const RESTARTS = n <= 40 ? 40 : 15, ITERS = 20000 + n * 2500;
   for (let rs = 0; rs < RESTARTS; rs++) {
     const init = initial();
     if (!init) continue;
@@ -443,27 +496,26 @@ function optimize(){
     let cur = score(a);
     let localBest = a.slice(), localScore = cur;
     for (let it = 0; it < ITERS; it++) {
-      const T = 60 * Math.pow(0.5 / 60, it / ITERS);
+      const T = 150 * Math.pow(0.5 / 150, it / ITERS);
       const i = Math.floor(Math.random() * n), r = Math.floor(Math.random() * nR), old = a[i];
       if (r === old || !compat(i, r)) continue;
-      if (occ[r] < CAP[r] && Math.random() < 0.5) {
-        a[i] = r;
-        const ns = score(a);
-        if (ns >= cur || Math.random() < Math.exp((ns - cur) / T)) { cur = ns; occ[old]--; occ[r]++; }
-        else a[i] = old;
-      } else {
-        const members = [];
-        for (let j = 0; j < n; j++) if (a[j] === r) members.push(j);
-        if (!members.length) continue;
-        const j = members[Math.floor(Math.random() * members.length)];
+      let j = -1;
+      if (!(occ[r] < CAP[r] && Math.random() < 0.5)) {
+        const m = membersOf(a, r);
+        if (!m.length) continue;
+        j = m[Math.floor(Math.random() * m.length)];
         if (!compat(j, old)) continue;
-        a[i] = r; a[j] = old;
-        const ns = score(a);
-        if (ns >= cur || Math.random() < Math.exp((ns - cur) / T)) cur = ns;
-        else { a[i] = old; a[j] = r; }
       }
-      if (cur > localScore) { localScore = cur; localBest = a.slice(); }
+      const d = tryMove(a, occ, i, r, j);
+      if (d >= 0 || Math.random() < Math.exp(d / T)) {
+        cur += d;
+        if (cur > localScore) { localScore = cur; localBest = a.slice(); }
+      } else undo(a, occ, i, r, j, old);
     }
+    // bestes Ergebnis dieses Durchlaufs noch feinschleifen
+    const occB = new Array(nR).fill(0); localBest.forEach(r => occB[r]++);
+    polish(localBest, occB);
+    localScore = score(localBest);
     if (localScore > bestScore) { bestScore = localScore; best = localBest; }
   }
   if (!best) throw new Error('Die Kinder passen nicht in die Zimmer (Jungen/Mädchen-Zimmer prüfen).');
@@ -520,6 +572,11 @@ function renderResult(){
     <div class="stat s2"><b>${c[1]}</b>2. Wunsch</div>
     <div class="stat s3"><b>${c[2]}</b>3. Wunsch</div>
     <div class="stat s0"><b>${c[3]}</b>ohne Wunsch</div>`;
+  const lost = S.filter(s => info.get(s.id).cls === 'w0');
+  if (lost.length) $('#stats').innerHTML += `<div class="muted" style="width:100%">
+    Ohne Wunsch: ${lost.map(s => `<b>${esc(s.name)}</b> (wollte ${info.get(s.id).ws.filter(Boolean).map(id => esc(byId(id).name)).join(', ')})`).join('; ')}.
+    Die Seite hat sehr viele Möglichkeiten durchprobiert – diese Wunschkinder sind so gefragt, dass sonst ein anderes Kind leer ausgehen würde.
+    Tipp: Zimmer mit einem Bett mehr anlegen oder das Kind nach weiteren Wünschen fragen.</div>`;
   const alone = state.rooms.map(r => S.filter(s => asg[s.id] === r.id)).filter(m => m.length === 1);
   if (alone.length) $('#stats').innerHTML += `<div class="err" style="width:100%">Achtung: ${alone.map(m => esc(m[0].name)).join(', ')} ist allein im Zimmer.
     Zieh ein anderes Kind dazu oder klick „Zimmer automatisch anlegen“ und verteile neu.</div>`;
