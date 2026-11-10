@@ -491,16 +491,24 @@ function optimize(){
     }
   };
 
+  const countNone = a => { let c = 0; for (let i = 0; i < n; i++) if (kid(a, i) === NONE_PENALTY) c++; return c; };
+
   let best = null, bestScore = -Infinity;
   const RESTARTS = n <= 40 ? 40 : 15, ITERS = 20000 + n * 2500;
-  for (let rs = 0; rs < RESTARTS; rs++) {
+  const t0 = performance.now(), MAX_MS = 6000;
+  for (let rs = 0; ; rs++) {
+    // Reguläre Durchläufe – und wenn danach noch ein Kind ohne Wunsch ist: weitersuchen (bis max. 8 Sekunden)
+    if (rs >= RESTARTS && (!best || countNone(best) === 0 || performance.now() - t0 > MAX_MS)) break;
     const init = initial();
-    if (!init) continue;
+    if (!init) { if (rs > RESTARTS) break; continue; }
     const { a, occ } = init;
     let cur = score(a);
     let localBest = a.slice(), localScore = cur;
+    // Am Anfang hohe "Temperatur": dann werden auch schlechtere Zwischenschritte probiert,
+    // um aus Sackgassen herauszukommen. Zum Ende hin wird nur noch verbessert.
+    const T0 = rs % 2 ? 4000 : 400;
     for (let it = 0; it < ITERS; it++) {
-      const T = 150 * Math.pow(0.5 / 150, it / ITERS);
+      const T = T0 * Math.pow(0.5 / T0, it / ITERS);
       const i = Math.floor(Math.random() * n), r = Math.floor(Math.random() * nR), old = a[i];
       if (r === old || !compat(i, r)) continue;
       let j = -1;
@@ -530,7 +538,7 @@ function optimize(){
 
 function run(){
   $('#err').textContent = '';
-  $('#busy').textContent = 'Rechne …';
+  $('#busy').textContent = 'Rechne … (kann ein paar Sekunden dauern)';
   selected = null;
   setTimeout(() => {
     try {
@@ -583,7 +591,7 @@ function renderResult(){
     <div class="alert-title">⚠ Es geht nicht, dass jedes Kind einen Wunsch im Zimmer hat</div>
     <div>${lost.length === 1 ? 'Dieses Kind ist' : `Diese ${lost.length} Kinder sind`} mit <b>keinem</b> Wunschkind im Zimmer:</div>
     <ul>${lost.map(s => `<li><b>${esc(s.name)}</b> – wollte ${info.get(s.id).ws.filter(Boolean).map(id => esc(byId(id).name)).join(', ')}</li>`).join('')}</ul>
-    <div>Die Seite hat sehr viele Möglichkeiten durchprobiert: Diese Wunschkinder sind so gefragt, dass sonst andere Kinder leer ausgehen würden.
+    <div>Die Seite hat sehr viele Möglichkeiten durchprobiert – auch, ob es klappt, wenn andere Kinder dafür nur ihren 3. Wunsch bekommen. Es geht nicht: Diese Wunschkinder sind so gefragt, dass sonst andere Kinder ganz leer ausgehen würden.
     <b>Tipp:</b> Zimmer mit einem Bett mehr anlegen oder ${lost.length === 1 ? 'das Kind' : 'die Kinder'} nach weiteren Wünschen fragen.</div>`;
   const alone = state.rooms.map(r => S.filter(s => asg[s.id] === r.id)).filter(m => m.length === 1);
   if (alone.length) $('#stats').innerHTML += `<div class="err" style="width:100%">Achtung: ${alone.map(m => esc(m[0].name)).join(', ')} ist allein im Zimmer.
