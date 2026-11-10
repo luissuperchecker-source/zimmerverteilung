@@ -75,7 +75,8 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
     <h2><span class="step">1</span>Kinder eintragen</h2>
     <p class="hint">Deine Klassenliste aus Excel, Word oder Google Tabellen markieren, kopieren und hier einfügen.
       Spalte 1 = Name, Spalte 2 = 1. Wunsch, Spalte 3 = 2. Wunsch, Spalte 4 = 3. Wunsch.
-      Du kannst die Liste auch selbst tippen: pro Kind eine Zeile, die Namen mit Leertaste getrennt, z. B. <i>Anna Ben Clara Dora</i>.</p>
+      Du kannst die Liste auch selbst tippen: pro Kind eine Zeile, die Namen mit Leertaste getrennt, z. B. <i>Anna Ben Clara Dora</i>.
+      Jungen und Mädchen werden am Vornamen erkannt. Wenn ein Name nicht klar ist, einfach <b>j</b> oder <b>w</b> mit in die Zeile schreiben, z. B. <i>Keifer j paul jonas ralf</i>.</p>
     <textarea id="bulk" placeholder="Anna&#9;Clara&#9;Emma&#9;Ida&#10;Ben&#9;Finn&#9;Jonas&#9;Max&#10;…"></textarea>
     <div class="row" style="margin-top:8px">
       <button class="primary" id="bulkAdd">Liste übernehmen</button>
@@ -194,6 +195,24 @@ function findStudent(name){
   return part.length === 1 ? part[0] : null;
 }
 
+/* ---------- Junge / Mädchen erkennen ---------- */
+const BOYS = new Set(`aaron adam adrian ahmad ahmed ahmet alessandro alexander ali amir anatol andreas anton aras arda arthur artur bastian ben benedikt benjamin bennet bennett berat bjarne burak can carl christian christoph colin collin connor constantin damian daniel dario david dennis diego dieter dmitri dominik efe elias emil emilio emir emre enes enzo eric erik eren fabian felix finley finn finnley florian frank franz fred frederik friedrich fritz furkan fynn gabriel georg giuliano gustav hamza hannes hans harry hasan hendrik henri henrik henry hugo hussein ibrahim igor ilias ilja ilyas ivan jack jacob jakob jakub jan janik jannik jannis jarne jason jens jesper joel johann johannes john jona jonas jonathan jonte joscha joshua juri julian julius justin kacper kalle karim karl keifer kiefer kerem kerim kevin kilian killian konstantin kurt lars laurenz leandro len lenn lennard lennart lenny leo leon leonard leonhard levi liam lian linus lino lio lionel lorenz louis luan luca lucas lucien ludwig luis luka lukas luke magnus maik malik malte marcel marco mario marius markus marlon martin mathis matteo mattheo matthias mattis mats mads max maxim maximilian mehmet merlin mert michael mika mikail mike milan milo mio mohamed mohammed moritz muhammad mustafa nael nathan nevio nick niclas nico nicolas niels niklas nils noah noam noel oliver omar ole oscar oskar pascal patrick paul pavel peter philipp piet piotr pius quirin rafael rami raphael ralf ralph rayan roman ruben rolf ryan sam sami sammy samuel sebastian sergej severin silas simon sinan stefan steffen sven tammo tarik theo theodor thilo thomas til till tilo tim timo tjark tobias tom torben tristan tyler ulrich umut uwe valentin victor viktor vincent willi william wolfgang xaver yannick yannik yanis yannis yasin yunus yusuf yussuf zeno`.split(/\s+/));
+const GIRLS = new Set(`alicia alina alisa alissa alma aleyna alexandra amelie amélie amina amira anastasia angelina anja anke anna anni annie annika antonia asya aurora ava ayla aylin ayse azra beyza birgit büsra carla carolina caroline celina charlotte chiara christina clara claudia dana daniela darja defne diana dila dilara ecem ece eda ela elena elif elina elisa ella emely emilia emilie emily emine emma enna esra estelle eva fabienne fatima femke fenja finja fiona franziska frida frieda gabriele greta hailey hanna hannah hatice hedda heike helen helena hira ida ilayda ines irem isabel isabell isabella ivy jana jasmin jennifer jessica jette johanna jolina joleen josefine josephine julia jule juli juna kaja karla katarina katharina kathrin katrin kerstin kiara kira klara lara laura layla lea leah lena leni lenja leyla lia lili lilli lilly lily lina linda lisa liv lotta lotte luana lucia luisa louisa luna luzia lynn madita magdalena maja malia mara maria mariella marie marlene martha mathea mathilda matilda maya mayra melina melissa merle merve meryem mia mila milena mina mira mona nadine nadja natalia natalie nathalie neele nele nelly nina nisa noemi nora nova nur olivia paula paulina pauline petra philippa pia polina rabia rania rebecca rebekka ricarda rieke romy ronja rosa rose ruth sabine sabrina sandra sanja sara sarah selin selma sena sevgi sienna sina smilla sofia sofie sofija sophia sophie stella sude susanne svea svenja tabea talia tamara tanja tara thea theresa tilda tina ute uta valentina valerie vanessa vera victoria viktoria wanda wilma xenia yara yasmin yvonne zara zeynep zoe zoey zoé zuzanna`.split(/\s+/));
+const UNISEX = new Set('alex andrea charlie chris deniz elia jamie jo kai kim luca mika maxi nikita robin sascha sam toni yu'.split(' '));
+const BOY_MARK = /^(j|m|junge|jungen|boy|männlich|maennlich)$/i;
+const GIRL_MARK = /^(w|mä|mädchen|maedchen|girl|weiblich)$/i;
+
+// Gibt 'm', 'w' oder '' (unklar) zurück; sure=false heißt "nur geraten"
+function guessGender(name){
+  const first = norm(name).split(/[\s-]/)[0];
+  if (!first || UNISEX.has(first)) return { g: '', sure: false };
+  if (BOYS.has(first)) return { g: 'm', sure: true };
+  if (GIRLS.has(first)) return { g: 'w', sure: true };
+  if (/(a|ie|ine|elle|ette|ina)$/.test(first)) return { g: 'w', sure: false };
+  if (/(us|o|er|an|en|in|el|ik|ian)$/.test(first)) return { g: 'm', sure: false };
+  return { g: '', sure: false };
+}
+
 $('#bulkAdd').onclick = () => {
   const text = $('#bulk').value;
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -209,12 +228,26 @@ $('#bulkAdd').onclick = () => {
   const isTable = rows.some(r => r.length > 1);
   if (rows.length && /^(name|vorname|schüler|kind)/i.test(rows[0][0])) rows.shift();   // Überschrift weglassen
 
+  // Kürzel j/m/w (oder Junge/Mädchen) irgendwo in der Zeile = Geschlecht festlegen
+  const rowG = rows.map(r => {
+    let g = '';
+    for (let i = r.length - 1; i >= 1; i--) {
+      if (BOY_MARK.test(r[i])) { g = 'm'; r.splice(i, 1); }
+      else if (GIRL_MARK.test(r[i])) { g = 'w'; r.splice(i, 1); }
+    }
+    return g;
+  });
+
   // Großschreibung: "paul" -> "Paul"
   const cap = s => s.replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
 
   // 1) alle Namen aus Spalte 1 anlegen
   let added = 0;
-  rows.forEach(r => { if (!state.students.some(s => norm(s.name) === norm(r[0]))) { addStudent(cap(r[0])); added++; } });
+  rows.forEach((r, i) => {
+    let s = state.students.find(x => norm(x.name) === norm(r[0]));
+    if (!s) { addStudent(cap(r[0])); s = state.students[state.students.length - 1]; added++; }
+    if (rowG[i]) { s.g = rowG[i]; s.gSure = true; }
+  });
 
   // 2) Wünsche aus Spalte 2–4 zuordnen – Kinder, die nur als Wunsch vorkommen, werden neu angelegt
   const unknown = [], fromWish = [];
@@ -236,12 +269,26 @@ $('#bulkAdd').onclick = () => {
     s.w = w;
   });
 
+  // 3) Geschlecht für alle ohne Angabe erkennen
+  const unsure = [], unclear = [];
+  state.students.forEach(s => {
+    if (!s.name.trim()) return;
+    if (!s.g) { const x = guessGender(s.name); s.g = x.g; s.gSure = x.sure; }
+    if (!s.g) unclear.push(s.name);
+    else if (!s.gSure) unsure.push(`${s.name} (${s.g === 'm' ? 'Junge' : 'Mädchen'})`);
+  });
+  const boys = state.students.filter(s => s.g === 'm').length, girls = state.students.filter(s => s.g === 'w').length;
+
   $('#bulk').value = '';
-  let msg = `<span class="ok">✓</span> ${added} Kinder angelegt` + (isTable ? `, ${wishes} Wünsche übernommen.` : '.');
+  let msg = `<span class="ok">✓</span> ${added} Kinder angelegt` + (isTable ? `, ${wishes} Wünsche übernommen.` : '.')
+    + ` ${boys} Jungen, ${girls} Mädchen erkannt.`;
+  if (unclear.length) msg += `<div class="err" style="font-weight:400">Geschlecht nicht erkannt: ${unclear.map(esc).join(', ')} – bitte unten auswählen oder in der Zeile <b>j</b> oder <b>w</b> dazuschreiben (z. B. <i>Kim w paul jonas ralf</i>).</div>`;
+  if (unsure.length) msg += `<div class="muted">Nur geraten, bitte kurz prüfen: ${unsure.map(esc).join(', ')}.</div>`;
   if (fromWish.length) msg += `<div class="muted">Nur als Wunsch genannt und deshalb neu angelegt: ${fromWish.map(esc).join(', ')}. Falls da ein Tippfehler dabei ist, unten in der Liste korrigieren.</div>`;
   if (unknown.length) msg += `<div class="err" style="font-weight:400">Diese Wünsche konnte ich nicht zuordnen (bitte unten von Hand auswählen):<br>${unknown.map(esc).join('<br>')}</div>`;
   $('#importMsg').innerHTML = msg;
-  if (unknown.length) $('#wishDetails').open = true;
+  if (unknown.length || unclear.length || unsure.length) $('#wishDetails').open = true;
+  state.roomsAuto = true;   // Zimmer beim Verteilen passend zu Jungen/Mädchen neu anlegen
   save(); renderStudents(); renderRooms(); renderResult();
 };
 $('#addOne').onclick = () => {
@@ -270,7 +317,8 @@ function renderStudents(){
     nm.onchange = () => { s.name = nm.value.trim(); save(); renderStudents(); renderResult(); };
     const g = tr.querySelector('.g');
     g.value = s.g;
-    g.onchange = () => { s.g = g.value; save(); renderStudents(); };
+    g.onchange = () => { s.g = g.value; s.gSure = true; save(); renderStudents(); };
+    if (s.g && !s.gSure) g.title = 'Nur geraten – bitte prüfen';
     tr.querySelectorAll('select.w').forEach(sel => {
       const k = +sel.dataset.k;
       sel.innerHTML = '<option value="">–</option>' + sorted.filter(o => o.id !== s.id)
@@ -311,11 +359,12 @@ function autoRooms(){
     }
   }
   state.result = null;
+  state.roomsAuto = true;
   save(); renderRooms(); renderResult();
   if (!state.rooms.length) $('#err').textContent = 'Erst Kinder eintragen.';
 }
 $('#autoRooms').onclick = () => { autoRooms(); $('#roomDetails').open = true; };
-$('#addRoom').onclick = () => { state.rooms.push({ id: uid(), name: `Zimmer ${state.rooms.length + 1}`, cap: 4, g: '' }); save(); renderRooms(); };
+$('#addRoom').onclick = () => { state.roomsAuto = false; state.rooms.push({ id: uid(), name: `Zimmer ${state.rooms.length + 1}`, cap: 4, g: '' }); save(); renderRooms(); };
 
 function renderRooms(){
   const tb = $('#rooms tbody');
@@ -326,12 +375,12 @@ function renderRooms(){
       <td><input class="rc" type="number" min="1" max="20" value="${r.cap}" style="width:80px"></td>
       <td><select class="rg"><option value="">alle</option><option value="m">Jungen</option><option value="w">Mädchen</option></select></td>
       <td><button class="x" title="Entfernen">✕</button></td>`;
-    tr.querySelector('.rn').oninput = e => { r.name = e.target.value; save(); };
+    tr.querySelector('.rn').oninput = e => { r.name = e.target.value; state.roomsAuto = false; save(); };
     tr.querySelector('.rn').onchange = () => renderResult();
-    tr.querySelector('.rc').onchange = e => { r.cap = Math.max(1, +e.target.value || 1); save(); renderRooms(); };
+    tr.querySelector('.rc').onchange = e => { r.cap = Math.max(1, +e.target.value || 1); state.roomsAuto = false; save(); renderRooms(); };
     const rg = tr.querySelector('.rg'); rg.value = r.g;
-    rg.onchange = () => { r.g = rg.value; save(); };
-    tr.querySelector('.x').onclick = () => { state.rooms = state.rooms.filter(o => o !== r); save(); renderRooms(); renderResult(); };
+    rg.onchange = () => { r.g = rg.value; state.roomsAuto = false; save(); };
+    tr.querySelector('.x').onclick = () => { state.roomsAuto = false; state.rooms = state.rooms.filter(o => o !== r); save(); renderRooms(); renderResult(); };
     tb.appendChild(tr);
   });
   const beds = state.rooms.reduce((a, r) => a + (+r.cap || 0), 0);
@@ -437,7 +486,7 @@ function run(){
   }, 30);
 }
 $('#go').onclick = () => {
-  if (!state.rooms.length) autoRooms();
+  if (!state.rooms.length || state.roomsAuto) autoRooms();
   run();
 };
 $('#again').onclick = run;
