@@ -75,7 +75,7 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
     <h2><span class="step">1</span>Kinder eintragen</h2>
     <p class="hint">Deine Klassenliste aus Excel, Word oder Google Tabellen markieren, kopieren und hier einfügen.
       Spalte 1 = Name, Spalte 2 = 1. Wunsch, Spalte 3 = 2. Wunsch, Spalte 4 = 3. Wunsch.
-      Nur Namen (ein Name pro Zeile) geht auch.</p>
+      Du kannst die Liste auch selbst tippen: pro Kind eine Zeile, die Namen mit Leertaste getrennt, z. B. <i>Anna Ben Clara Dora</i>.</p>
     <textarea id="bulk" placeholder="Anna&#9;Clara&#9;Emma&#9;Ida&#10;Ben&#9;Finn&#9;Jonas&#9;Max&#10;…"></textarea>
     <div class="row" style="margin-top:8px">
       <button class="primary" id="bulkAdd">Liste übernehmen</button>
@@ -195,11 +195,16 @@ function findStudent(name){
 $('#bulkAdd').onclick = () => {
   const text = $('#bulk').value;
   const lines = text.split(/\r?\n/).filter(l => l.trim());
-  const isTable = lines.some(l => /\t|;/.test(l));
-  let rows = isTable
-    ? lines.map(l => l.split(/\t|;/).map(c => c.trim()))
-    : lines.flatMap(l => l.split(',')).map(c => [c.trim()]);
-  rows = rows.filter(r => r[0]);
+  // Trennzeichen pro Zeile: Tab/Semikolon (Excel) > mehrere Leerzeichen > Komma > einzelnes Leerzeichen
+  const splitLine = l => {
+    l = l.trim();
+    if (/\t|;/.test(l)) return l.split(/\t|;/);
+    if (/\s{2,}/.test(l)) return l.split(/\s{2,}/);
+    if (l.includes(',')) return l.split(',');
+    return l.split(/\s+/);
+  };
+  let rows = lines.map(l => splitLine(l).map(c => c.trim())).filter(r => r[0]);
+  const isTable = rows.some(r => r.length > 1);
   if (rows.length && /^(name|vorname|schüler|kind)/i.test(rows[0][0])) rows.shift();   // Überschrift weglassen
 
   // 1) alle Namen aus Spalte 1 anlegen
