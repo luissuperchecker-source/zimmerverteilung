@@ -82,10 +82,9 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
       <button id="addOne">+ Ein Kind</button>
     </div>
     <div id="importMsg" style="margin-top:10px"></div>
-  </section>
 
-  <section>
-    <h2><span class="step">2</span>Wünsche auswählen</h2>
+    <details id="wishDetails">
+    <summary>Liste ansehen oder einzelne Wünsche ändern (<span id="kidCount">0</span> Kinder)</summary>
     <p class="hint">Geschlecht ist freiwillig – wenn du es einträgst, kommen Jungen und Mädchen in getrennte Zimmer.</p>
     <div class="tablewrap">
       <table id="students">
@@ -94,10 +93,11 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
       </table>
     </div>
     <p class="muted" id="noStudents">Noch keine Kinder eingetragen.</p>
+    </details>
   </section>
 
   <section>
-    <h2><span class="step">3</span>Zimmer festlegen</h2>
+    <h2><span class="step">2</span>Zimmer festlegen</h2>
     <div class="row">
       <span>Zimmer mit</span>
       <input id="roomSize" type="number" min="2" max="12" value="4" style="width:70px">
@@ -117,7 +117,7 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
   </section>
 
   <section>
-    <h2><span class="step">4</span>Verteilen</h2>
+    <h2><span class="step">3</span>Verteilen</h2>
     <div class="row">
       <button class="primary big" id="go">Zimmer verteilen</button>
       <span class="muted" id="busy"></span>
@@ -226,9 +226,11 @@ $('#bulkAdd').onclick = () => {
   let msg = `<span class="ok">✓</span> ${added} Kinder neu angelegt` + (isTable ? `, ${wishes} Wünsche übernommen.` : '.');
   if (unknown.length) msg += `<div class="err" style="font-weight:400">Diese Wünsche konnte ich keinem Kind zuordnen (bitte unten von Hand auswählen):<br>${unknown.map(esc).join('<br>')}</div>`;
   $('#importMsg').innerHTML = msg;
+  if (unknown.length) $('#wishDetails').open = true;
   save(); renderStudents(); renderRooms(); renderResult();
 };
 $('#addOne').onclick = () => {
+  $('#wishDetails').open = true;
   addStudent(''); save(); renderStudents();
   const inputs = document.querySelectorAll('#students input.nm');
   inputs[inputs.length - 1]?.focus();
@@ -237,6 +239,7 @@ $('#addOne').onclick = () => {
 function renderStudents(){
   const tb = $('#students tbody');
   tb.innerHTML = '';
+  $('#kidCount').textContent = state.students.length;
   $('#noStudents').hidden = state.students.length > 0;
   $('#students').hidden = state.students.length === 0;
   const sorted = [...state.students].filter(s => s.name.trim()).sort((a, b) => a.name.localeCompare(b.name, 'de'));
@@ -327,7 +330,7 @@ function optimize(){
   const R = state.rooms.filter(r => +r.cap > 0);
   const n = S.length, nR = R.length;
   if (n < 2) throw new Error('Bitte mindestens 2 Kinder eintragen.');
-  if (!nR) throw new Error('Bitte zuerst Zimmer anlegen (Schritt 3).');
+  if (!nR) throw new Error('Bitte zuerst Zimmer anlegen (Schritt 2).');
   const CAP = R.map(r => +r.cap);
   if (CAP.reduce((a, b) => a + b, 0) < n) throw new Error('Es gibt weniger Betten als Kinder. Bitte Zimmer anpassen.');
   const idx = new Map(S.map((s, i) => [s.id, i]));
