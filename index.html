@@ -73,12 +73,15 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
 
   <section>
     <h2><span class="step">1</span>Kinder eintragen</h2>
-    <p class="hint">Namen hier einfügen (ein Name pro Zeile) – oder unten einzeln hinzufügen.</p>
-    <textarea id="bulk" placeholder="Anna&#10;Ben&#10;Clara&#10;…"></textarea>
+    <p class="hint">Deine Klassenliste aus Excel, Word oder Google Tabellen markieren, kopieren und hier einfügen.
+      Spalte 1 = Name, Spalte 2 = 1. Wunsch, Spalte 3 = 2. Wunsch, Spalte 4 = 3. Wunsch.
+      Nur Namen (ein Name pro Zeile) geht auch.</p>
+    <textarea id="bulk" placeholder="Anna&#9;Clara&#9;Emma&#9;Ida&#10;Ben&#9;Finn&#9;Jonas&#9;Max&#10;…"></textarea>
     <div class="row" style="margin-top:8px">
-      <button class="primary" id="bulkAdd">Namen hinzufügen</button>
+      <button class="primary" id="bulkAdd">Liste übernehmen</button>
       <button id="addOne">+ Ein Kind</button>
     </div>
+    <div id="importMsg" style="margin-top:10px"></div>
   </section>
 
   <section>
@@ -175,12 +178,55 @@ const roomById = id => state.rooms.find(r => r.id === id);
 /* ---------- Kinder ---------- */
 function addStudent(name){ state.students.push({ id: uid(), name, g: '', w: [null, null, null] }); }
 
+const norm = s => s.toLowerCase().replace(/\s+/g, ' ').trim();
+// Findet ein Kind zu einem eingetippten Namen – auch bei "Anna" statt "Anna Müller"
+function findStudent(name){
+  const n = norm(name);
+  if (!n) return null;
+  const exact = state.students.find(s => norm(s.name) === n);
+  if (exact) return exact;
+  const part = state.students.filter(s => {
+    const sn = norm(s.name);
+    return sn.startsWith(n + ' ') || n.startsWith(sn + ' ') || sn.split(' ').includes(n);
+  });
+  return part.length === 1 ? part[0] : null;
+}
+
 $('#bulkAdd').onclick = () => {
-  const names = $('#bulk').value.split(/\n|,|;/).map(s => s.trim()).filter(Boolean);
-  const have = new Set(state.students.map(s => s.name.toLowerCase()));
-  names.forEach(n => { if (!have.has(n.toLowerCase())) { addStudent(n); have.add(n.toLowerCase()); } });
+  const text = $('#bulk').value;
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const isTable = lines.some(l => /\t|;/.test(l));
+  let rows = isTable
+    ? lines.map(l => l.split(/\t|;/).map(c => c.trim()))
+    : lines.flatMap(l => l.split(',')).map(c => [c.trim()]);
+  rows = rows.filter(r => r[0]);
+  if (rows.length && /^(name|vorname|schüler|kind)/i.test(rows[0][0])) rows.shift();   // Überschrift weglassen
+
+  // 1) alle Namen aus Spalte 1 anlegen
+  let added = 0;
+  rows.forEach(r => { if (!state.students.some(s => norm(s.name) === norm(r[0]))) { addStudent(r[0]); added++; } });
+
+  // 2) Wünsche aus Spalte 2–4 zuordnen
+  const unknown = [];
+  let wishes = 0;
+  if (isTable) rows.forEach(r => {
+    const s = state.students.find(x => norm(x.name) === norm(r[0]));
+    const w = [null, null, null];
+    for (let k = 0; k < 3; k++) {
+      const cell = r[k + 1];
+      if (!cell) continue;
+      const o = findStudent(cell);
+      if (o && o !== s) { w[k] = o.id; wishes++; }
+      else unknown.push(`${r[0]}: „${cell}“`);
+    }
+    s.w = w;
+  });
+
   $('#bulk').value = '';
-  save(); renderStudents(); renderRooms();
+  let msg = `<span class="ok">✓</span> ${added} Kinder neu angelegt` + (isTable ? `, ${wishes} Wünsche übernommen.` : '.');
+  if (unknown.length) msg += `<div class="err" style="font-weight:400">Diese Wünsche konnte ich keinem Kind zuordnen (bitte unten von Hand auswählen):<br>${unknown.map(esc).join('<br>')}</div>`;
+  $('#importMsg').innerHTML = msg;
+  save(); renderStudents(); renderRooms(); renderResult();
 };
 $('#addOne').onclick = () => {
   addStudent(''); save(); renderStudents();
