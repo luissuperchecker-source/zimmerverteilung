@@ -166,6 +166,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 const WISH_POINTS = [100, 60, 30];   // bester erfüllter Wunsch
 const NONE_PENALTY = -200;           // kein Wunsch erfüllt
 const EXTRA_POINTS = 5;              // jeder weitere erfüllte Wunsch
+const ALONE_PENALTY = -5000;         // ein Kind allein im Zimmer
 
 let state = load() || { students: [], rooms: [], result: null };
 let selected = null;
@@ -361,6 +362,10 @@ function optimize(){
       for (let k = 0; k < 3; k++) if (w[k] >= 0 && a[w[k]] === ri) { cnt++; if (best < 0) best = k; }
       t += best < 0 ? NONE_PENALTY : WISH_POINTS[best] + EXTRA_POINTS * (cnt - 1);
     }
+    // Niemand soll allein in einem Zimmer sein
+    const cnt = new Array(nR).fill(0);
+    for (let i = 0; i < n; i++) cnt[a[i]]++;
+    for (let r = 0; r < nR; r++) if (cnt[r] === 1) t += ALONE_PENALTY;
     return t;
   };
 
@@ -465,6 +470,9 @@ function renderResult(){
     <div class="stat s2"><b>${c[1]}</b>2. Wunsch</div>
     <div class="stat s3"><b>${c[2]}</b>3. Wunsch</div>
     <div class="stat s0"><b>${c[3]}</b>ohne Wunsch</div>`;
+  const alone = state.rooms.map(r => S.filter(s => asg[s.id] === r.id)).filter(m => m.length === 1);
+  if (alone.length) $('#stats').innerHTML += `<div class="err" style="width:100%">Achtung: ${alone.map(m => esc(m[0].name)).join(', ')} ist allein im Zimmer.
+    Zieh ein anderes Kind dazu oder klick „Zimmer automatisch anlegen“ und verteile neu.</div>`;
 
   const grid = $('#resultRooms');
   grid.innerHTML = '';
