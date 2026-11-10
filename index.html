@@ -207,12 +207,15 @@ $('#bulkAdd').onclick = () => {
   const isTable = rows.some(r => r.length > 1);
   if (rows.length && /^(name|vorname|schüler|kind)/i.test(rows[0][0])) rows.shift();   // Überschrift weglassen
 
+  // Großschreibung: "paul" -> "Paul"
+  const cap = s => s.replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+
   // 1) alle Namen aus Spalte 1 anlegen
   let added = 0;
-  rows.forEach(r => { if (!state.students.some(s => norm(s.name) === norm(r[0]))) { addStudent(r[0]); added++; } });
+  rows.forEach(r => { if (!state.students.some(s => norm(s.name) === norm(r[0]))) { addStudent(cap(r[0])); added++; } });
 
-  // 2) Wünsche aus Spalte 2–4 zuordnen
-  const unknown = [];
+  // 2) Wünsche aus Spalte 2–4 zuordnen – Kinder, die nur als Wunsch vorkommen, werden neu angelegt
+  const unknown = [], fromWish = [];
   let wishes = 0;
   if (isTable) rows.forEach(r => {
     const s = state.students.find(x => norm(x.name) === norm(r[0]));
@@ -220,7 +223,11 @@ $('#bulkAdd').onclick = () => {
     for (let k = 0; k < 3; k++) {
       const cell = r[k + 1];
       if (!cell) continue;
-      const o = findStudent(cell);
+      let o = findStudent(cell);
+      if (!o && norm(cell) !== norm(s.name)) {
+        addStudent(cap(cell)); o = state.students[state.students.length - 1];
+        fromWish.push(o.name); added++;
+      }
       if (o && o !== s) { w[k] = o.id; wishes++; }
       else unknown.push(`${r[0]}: „${cell}“`);
     }
@@ -228,8 +235,9 @@ $('#bulkAdd').onclick = () => {
   });
 
   $('#bulk').value = '';
-  let msg = `<span class="ok">✓</span> ${added} Kinder neu angelegt` + (isTable ? `, ${wishes} Wünsche übernommen.` : '.');
-  if (unknown.length) msg += `<div class="err" style="font-weight:400">Diese Wünsche konnte ich keinem Kind zuordnen (bitte unten von Hand auswählen):<br>${unknown.map(esc).join('<br>')}</div>`;
+  let msg = `<span class="ok">✓</span> ${added} Kinder angelegt` + (isTable ? `, ${wishes} Wünsche übernommen.` : '.');
+  if (fromWish.length) msg += `<div class="muted">Nur als Wunsch genannt und deshalb neu angelegt: ${fromWish.map(esc).join(', ')}. Falls da ein Tippfehler dabei ist, unten in der Liste korrigieren.</div>`;
+  if (unknown.length) msg += `<div class="err" style="font-weight:400">Diese Wünsche konnte ich nicht zuordnen (bitte unten von Hand auswählen):<br>${unknown.map(esc).join('<br>')}</div>`;
   $('#importMsg').innerHTML = msg;
   if (unknown.length) $('#wishDetails').open = true;
   save(); renderStudents(); renderRooms(); renderResult();
