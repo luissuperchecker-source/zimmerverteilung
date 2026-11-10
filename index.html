@@ -149,6 +149,7 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
     <div class="row noprint" style="margin-top:14px">
       <button id="again">Andere Verteilung versuchen</button>
       <button onclick="window.print()">Drucken</button>
+      <button id="excelBtn">Als Excel speichern</button>
     </div>
   </section>
 
@@ -667,6 +668,56 @@ function moveTo(roomId){
   state.result[selected] = roomId;
   selected = null; save(); renderResult();
 }
+
+/* ---------- Excel-Tabelle: Kind | Zimmerkameraden ---------- */
+function makeXlsx(rows){
+  const x = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const col = i => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - 1 - m) / 26; } return s; };
+  const maxCols = Math.max(...rows.map(r => r.length));
+  const sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    `<cols><col min="1" max="${maxCols}" width="20" customWidth="1"/></cols><sheetData>` +
+    rows.map((r, ri) => `<row r="${ri + 1}">` + r.map((v, ci) =>
+      `<c r="${col(ci)}${ri + 1}" t="inlineStr"${ri === 0 ? ' s="1"' : ''}><is><t>${x(v)}</t></is></c>`).join('') + '</row>').join('') +
+    '</sheetData></worksheet>';
+  const files = {
+    '[Content_Types].xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+    '_rels/.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    'xl/workbook.xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Zimmer" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    'xl/styles.xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>',
+    'xl/worksheets/sheet1.xml': sheet
+  };
+  // ZIP ohne Kompression
+  const enc = new TextEncoder(), crcT = [];
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; crcT[n] = c >>> 0; }
+  const crc = b => { let c = 0xFFFFFFFF; for (const v of b) c = crcT[(c ^ v) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const parts = [], central = []; let off = 0;
+  const u16 = v => [v & 255, (v >>> 8) & 255], u32 = v => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255];
+  for (const [name, text] of Object.entries(files)) {
+    const nb = enc.encode(name), data = enc.encode(text), c = crc(data);
+    const common = [...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(c), ...u32(data.length), ...u32(data.length), ...u16(nb.length), ...u16(0)];
+    const local = new Uint8Array([...u32(0x04034b50), ...common, ...nb]);
+    parts.push(local, data);
+    central.push(new Uint8Array([...u32(0x02014b50), ...u16(20), ...common, ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off), ...nb]));
+    off += local.length + data.length;
+  }
+  const cdSize = central.reduce((s, b) => s + b.length, 0), n = central.length;
+  const end = new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(n), ...u16(n), ...u32(cdSize), ...u32(off), ...u16(0)]);
+  return new Blob([...parts, ...central, end], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+function excelRows(){
+  const asg = state.result, S = state.students.filter(s => s.name.trim());
+  const sorted = [...S].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const rows = sorted.map(s => [s.name.trim(), ...sorted.filter(o => o.id !== s.id && asg[o.id] === asg[s.id]).map(o => o.name.trim())]);
+  return [['Kind', 'Im Zimmer mit'], ...rows];
+}
+$('#excelBtn').onclick = () => {
+  if (!state.result) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(makeXlsx(excelRows()));
+  a.download = 'Zimmerverteilung.xlsx'; a.click();
+};
 
 /* ---------- Speichern ---------- */
 $('#exportBtn').onclick = () => {
