@@ -80,6 +80,7 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
     <div class="row" style="margin-top:8px">
       <button class="primary" id="bulkAdd">Liste übernehmen</button>
       <button id="addOne">+ Ein Kind</button>
+      <button id="restart" style="margin-left:auto">Neu beginnen</button>
     </div>
     <div id="importMsg" style="margin-top:10px"></div>
 
@@ -562,10 +563,15 @@ $('#importFile').onchange = async e => {
   } catch (_) { alert('Die Datei konnte nicht gelesen werden.'); }
   e.target.value = '';
 };
-$('#clearAll').onclick = () => {
-  if (!confirm('Wirklich alle Kinder, Wünsche und Zimmer löschen?')) return;
-  state = { students: [], rooms: [], result: null }; save(); renderAll();
-};
+function startOver(){
+  if (!confirm('Von neuem beginnen? Alle Kinder, Wünsche, Zimmer und die Verteilung werden gelöscht.')) return;
+  state = { students: [], rooms: [], result: null }; selected = null;
+  $('#importMsg').innerHTML = ''; $('#err').textContent = ''; $('#bulk').value = '';
+  save(); renderAll();
+  window.scrollTo({ top: 0, behavior: 'smooth' }); $('#bulk').focus();
+}
+$('#clearAll').onclick = startOver;
+$('#restart').onclick = startOver;
 
 function renderAll(){ renderStudents(); renderRooms(); renderResult(); }
 renderAll();
