@@ -134,7 +134,7 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
       <span style="--c:var(--w3)">3. Wunsch</span>
       <span style="--c:var(--w0)">kein Wunsch erfüllt</span>
     </div>
-    <p class="hint noprint">Von Hand ändern: ein Kind antippen, dann ein anderes Kind antippen (tauschen) oder einen freien Platz (verschieben).</p>
+    <p class="hint noprint">Von Hand ändern: ein Kind mit der Maus in ein anderes Zimmer ziehen. Auf ein anderes Kind ziehen = die beiden tauschen. (Am Handy: Kind antippen, dann anderes Kind oder freien Platz antippen.)</p>
     <div class="grid" id="resultRooms"></div>
     <details open style="margin-top:14px">
       <summary>Übersicht pro Kind</summary>
@@ -483,6 +483,13 @@ function renderResult(){
       chip.title = 'Wünsche: ' + x.ws.map((id, k) => id ? `${k + 1}. ${byId(id).name} ${x.hit[k] ? '✓' : '✗'}` : `${k + 1}. –`).join(', ');
       chip.innerHTML = `<span>${esc(s.name)}</span><span class="badge">${badge}</span>`;
       chip.onclick = () => clickChild(s.id);
+      chip.draggable = true;
+      chip.ondragstart = e => { e.dataTransfer.setData('text/plain', s.id); e.dataTransfer.effectAllowed = 'move'; };
+      chip.ondrop = e => {   // auf ein Kind ziehen = tauschen
+        e.preventDefault(); e.stopPropagation();
+        const id = e.dataTransfer.getData('text/plain');
+        if (id && id !== s.id) { selected = id; clickChild(s.id); }
+      };
       card.appendChild(chip);
     });
     for (let k = members.length; k < r.cap; k++) {
@@ -492,6 +499,15 @@ function renderResult(){
       f.onclick = () => moveTo(r.id);
       card.appendChild(f);
     }
+    // Ziehen & Ablegen: in ein Zimmer ziehen = verschieben (wenn Platz frei ist)
+    card.ondragover = e => e.preventDefault();
+    card.ondrop = e => {
+      e.preventDefault();
+      const id = e.dataTransfer.getData('text/plain');
+      if (!id || asg[id] === r.id) return;
+      if (members.length >= r.cap) { alert(`${r.name} ist voll. Zieh das Kind direkt auf ein anderes Kind, dann tauschen die beiden.`); return; }
+      selected = id; moveTo(r.id);
+    };
     grid.appendChild(card);
   });
 
