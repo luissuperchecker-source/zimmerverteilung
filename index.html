@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zimmerverteilung Klassenfahrt</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--text:#1d1d1f;--muted:#6b6b70;--line:#e2e0da;--accent:#2f6fde;--accent-ink:#fff;
+  --w1:#1f9d55;--w2:#c98a07;--w3:#e0672b;--w0:#c53030;--sel:#2f6fde2a;--warn:#c53030}
+@media (prefers-color-scheme:dark){:root{--bg:#17171a;--card:#222226;--text:#ececef;--muted:#9a9aa2;--line:#38383f;
+  --accent:#6b9bff;--accent-ink:#0b1020;--w1:#3cc47c;--w2:#e5ac2a;--w3:#f08452;--w0:#f06464;--sel:#6b9bff33;--warn:#f06464}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,"Segoe UI",Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:28px 16px 80px}
+h1{font-size:28px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 24px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
+h2{font-size:19px;margin:0 0 12px;display:flex;align-items:center;gap:10px}
+.step{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:15px;flex:none}
+p.hint{color:var(--muted);margin:0 0 12px;font-size:14px}
+input,select,textarea,button{font:inherit;color:inherit}
+input,select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;width:100%;min-width:0}
+textarea{min-height:90px;resize:vertical}
+button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 13px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.big{font-size:17px;padding:11px 24px}
+button.x{border:none;background:none;color:var(--muted);padding:4px 8px}
+button.x:hover{color:var(--warn)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:13px;color:var(--muted);text-align:left;font-weight:500;padding:4px 5px;white-space:nowrap}
+td{padding:3px 5px;vertical-align:middle}
+td.num{color:var(--muted);font-size:13px;width:28px;text-align:right}
+#students td{min-width:120px} #students td.num,#students td:last-child{min-width:0}
+#students td.gcol{min-width:95px}
+select.warn,input.warn{border-color:var(--warn);color:var(--warn)}
+.th1{color:var(--w1)} .th2{color:var(--w2)} .th3{color:var(--w3)}
+details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
+#rooms td{min-width:90px}
+.err{color:var(--warn);font-weight:600;margin-top:10px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 16px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-width:120px}
+.stat b{font-size:22px;display:block}
+.stat.s1 b{color:var(--w1)} .stat.s2 b{color:var(--w2)} .stat.s3 b{color:var(--w3)} .stat.s0 b{color:var(--w0)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.room{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg)}
+.room h3{margin:0 0 8px;font-size:16px;display:flex;justify-content:space-between;gap:8px}
+.room h3 small{color:var(--muted);font-weight:400}
+.chip{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;margin:5px 0;border-radius:8px;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--muted);cursor:pointer;user-select:none}
+.chip.w1{border-left-color:var(--w1)} .chip.w2{border-left-color:var(--w2)} .chip.w3{border-left-color:var(--w3)} .chip.w0{border-left-color:var(--w0)}
+.chip.sel{background:var(--sel);border-color:var(--accent)}
+.badge{font-size:12px;font-weight:600;white-space:nowrap}
+.w1 .badge{color:var(--w1)} .w2 .badge{color:var(--w2)} .w3 .badge{color:var(--w3)} .w0 .badge{color:var(--w0)}
+.free{border:1px dashed var(--line);border-radius:8px;padding:6px 10px;margin:5px 0;color:var(--muted);font-size:13px;cursor:pointer}
+.free:hover{border-color:var(--accent);color:var(--accent)}
+.ok{color:var(--w1);font-weight:700} .no{color:var(--muted)}
+#overview td,#overview th{border-bottom:1px solid var(--line);padding:6px 5px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:12px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;background:var(--c)}
+.muted{color:var(--muted)}
+@media print{
+  body{background:#fff;color:#000} section:not(#resultSec),.noprint,h1,.sub{display:none!important}
+  #resultSec{border:none;padding:0} .chip{cursor:default}
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>Zimmerverteilung Klassenfahrt</h1>
+  <p class="sub">Jedes Kind nennt drei Wunschpartner. Die Seite verteilt alle so, dass möglichst viele ihren 1. Wunsch bekommen – und niemand ganz ohne Wunsch bleibt.</p>
+
+  <section>
+    <h2><span class="step">1</span>Kinder eintragen</h2>
+    <p class="hint">Namen hier einfügen (ein Name pro Zeile) – oder unten einzeln hinzufügen.</p>
+    <textarea id="bulk" placeholder="Anna&#10;Ben&#10;Clara&#10;…"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="primary" id="bulkAdd">Namen hinzufügen</button>
+      <button id="addOne">+ Ein Kind</button>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="step">2</span>Wünsche auswählen</h2>
+    <p class="hint">Geschlecht ist freiwillig – wenn du es einträgst, kommen Jungen und Mädchen in getrennte Zimmer.</p>
+    <div class="tablewrap">
+      <table id="students">
+        <thead><tr><th></th><th>Name</th><th>Geschlecht</th><th class="th1">1. Wunsch (sehr wichtig)</th><th class="th2">2. Wunsch (mittel)</th><th class="th3">3. Wunsch (weniger wichtig)</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="muted" id="noStudents">Noch keine Kinder eingetragen.</p>
+  </section>
+
+  <section>
+    <h2><span class="step">3</span>Zimmer festlegen</h2>
+    <div class="row">
+      <span>Zimmer mit</span>
+      <input id="roomSize" type="number" min="2" max="12" value="4" style="width:70px">
+      <span>Betten</span>
+      <button id="autoRooms">Zimmer automatisch anlegen</button>
+    </div>
+    <details id="roomDetails">
+      <summary>Zimmer einzeln bearbeiten (<span id="roomSum"></span>)</summary>
+      <div class="tablewrap">
+        <table id="rooms">
+          <thead><tr><th>Zimmer</th><th>Betten</th><th>Für</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button id="addRoom" style="margin-top:8px">+ Zimmer</button>
+    </details>
+  </section>
+
+  <section>
+    <h2><span class="step">4</span>Verteilen</h2>
+    <div class="row">
+      <button class="primary big" id="go">Zimmer verteilen</button>
+      <span class="muted" id="busy"></span>
+    </div>
+    <div class="err" id="err"></div>
+  </section>
+
+  <section id="resultSec" hidden>
+    <h2>Ergebnis</h2>
+    <div class="stats" id="stats"></div>
+    <div class="legend noprint">
+      <span style="--c:var(--w1)">1. Wunsch erfüllt</span>
+      <span style="--c:var(--w2)">2. Wunsch</span>
+      <span style="--c:var(--w3)">3. Wunsch</span>
+      <span style="--c:var(--w0)">kein Wunsch erfüllt</span>
+    </div>
+    <p class="hint noprint">Von Hand ändern: ein Kind antippen, dann ein anderes Kind antippen (tauschen) oder einen freien Platz (verschieben).</p>
+    <div class="grid" id="resultRooms"></div>
+    <details open style="margin-top:14px">
+      <summary>Übersicht pro Kind</summary>
+      <div class="tablewrap"><table id="overview"></table></div>
+    </details>
+    <div class="row noprint" style="margin-top:14px">
+      <button id="again">Andere Verteilung versuchen</button>
+      <button onclick="window.print()">Drucken</button>
+    </div>
+  </section>
+
+  <section class="noprint">
+    <h2>Speichern</h2>
+    <p class="hint">Alles wird automatisch in diesem Browser gespeichert. Für einen anderen Computer: als Datei sichern.</p>
+    <div class="row">
+      <button id="exportBtn">Als Datei sichern</button>
+      <button id="importBtn">Datei laden</button>
+      <input type="file" id="importFile" accept=".json" hidden>
+      <button id="clearAll">Alles löschen</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const KEY = 'zimmerverteilung-v1';
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const WISH_POINTS = [100, 60, 30];   // bester erfüllter Wunsch
+const NONE_PENALTY = -200;           // kein Wunsch erfüllt
+const EXTRA_POINTS = 5;              // jeder weitere erfüllte Wunsch
+
+let state = load() || { students: [], rooms: [], result: null };
+let selected = null;
+
+function load(){ try { return JSON.parse(localStorage.getItem(KEY)); } catch(e){ return null; } }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
+const byId = id => state.students.find(s => s.id === id);
+const roomById = id => state.rooms.find(r => r.id === id);
+
+/* ---------- Kinder ---------- */
+function addStudent(name){ state.students.push({ id: uid(), name, g: '', w: [null, null, null] }); }
+
+$('#bulkAdd').onclick = () => {
+  const names = $('#bulk').value.split(/\n|,|;/).map(s => s.trim()).filter(Boolean);
+  const have = new Set(state.students.map(s => s.name.toLowerCase()));
+  names.forEach(n => { if (!have.has(n.toLowerCase())) { addStudent(n); have.add(n.toLowerCase()); } });
+  $('#bulk').value = '';
+  save(); renderStudents(); renderRooms();
+};
+$('#addOne').onclick = () => {
+  addStudent(''); save(); renderStudents();
+  const inputs = document.querySelectorAll('#students input.nm');
+  inputs[inputs.length - 1]?.focus();
+};
+
+function renderStudents(){
+  const tb = $('#students tbody');
+  tb.innerHTML = '';
+  $('#noStudents').hidden = state.students.length > 0;
+  $('#students').hidden = state.students.length === 0;
+  const sorted = [...state.students].filter(s => s.name.trim()).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  state.students.forEach((s, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="num">${i + 1}</td>
+      <td><input class="nm" value="${esc(s.name)}" placeholder="Name"></td>
+      <td class="gcol"><select class="g"><option value="">–</option><option value="m">Junge</option><option value="w">Mädchen</option></select></td>
+      ${[0,1,2].map(k => `<td><select class="w" data-k="${k}"></select></td>`).join('')}
+      <td><button class="x" title="Entfernen">✕</button></td>`;
+    const nm = tr.querySelector('.nm');
+    nm.oninput = () => { s.name = nm.value; save(); };
+    nm.onchange = () => { s.name = nm.value.trim(); save(); renderStudents(); renderResult(); };
+    const g = tr.querySelector('.g');
+    g.value = s.g;
+    g.onchange = () => { s.g = g.value; save(); renderStudents(); };
+    tr.querySelectorAll('select.w').forEach(sel => {
+      const k = +sel.dataset.k;
+      sel.innerHTML = '<option value="">–</option>' + sorted.filter(o => o.id !== s.id)
+        .map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+      sel.value = s.w[k] && byId(s.w[k]) ? s.w[k] : '';
+      // Warnungen
+      const other = byId(s.w[k]);
+      const dup = s.w[k] && s.w.indexOf(s.w[k]) !== k;
+      const gx = other && s.g && other.g && s.g !== other.g;
+      if (dup || gx) { sel.classList.add('warn'); sel.title = dup ? 'Doppelt gewählt' : 'Anderes Geschlecht – kann nicht ins selbe Zimmer'; }
+      sel.onchange = () => { s.w[k] = sel.value || null; save(); renderStudents(); renderResult(); };
+    });
+    tr.querySelector('.x').onclick = () => {
+      if (s.name && !confirm(`${s.name} entfernen?`)) return;
+      state.students = state.students.filter(o => o !== s);
+      state.students.forEach(o => o.w = o.w.map(id => id === s.id ? null : id));
+      save(); renderStudents(); renderRooms(); renderResult();
+    };
+    tb.appendChild(tr);
+  });
+}
+
+/* ---------- Zimmer ---------- */
+function autoRooms(){
+  const size = Math.max(2, +$('#roomSize').value || 4);
+  const list = state.students.filter(s => s.name.trim());
+  const groups = [['m', 'Jungen'], ['w', 'Mädchen'], ['', 'Zimmer']];
+  const anyGender = list.some(s => s.g);
+  state.rooms = [];
+  let nr = 1;
+  for (const [g, label] of groups) {
+    const n = list.filter(s => (s.g || '') === g).length;
+    if (!n) continue;
+    const k = Math.ceil(n / size);
+    for (let i = 0; i < k; i++) {
+      const cap = Math.floor(n / k) + (i < n % k ? 1 : 0);   // gleichmäßig verteilen
+      state.rooms.push({ id: uid(), name: `Zimmer ${nr++}`, cap, g: anyGender ? g : '' });
+    }
+  }
+  state.result = null;
+  save(); renderRooms(); renderResult();
+  if (!state.rooms.length) $('#err').textContent = 'Erst Kinder eintragen.';
+}
+$('#autoRooms').onclick = () => { autoRooms(); $('#roomDetails').open = true; };
+$('#addRoom').onclick = () => { state.rooms.push({ id: uid(), name: `Zimmer ${state.rooms.length + 1}`, cap: 4, g: '' }); save(); renderRooms(); };
+
+function renderRooms(){
+  const tb = $('#rooms tbody');
+  tb.innerHTML = '';
+  state.rooms.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input class="rn" value="${esc(r.name)}"></td>
+      <td><input class="rc" type="number" min="1" max="20" value="${r.cap}" style="width:80px"></td>
+      <td><select class="rg"><option value="">alle</option><option value="m">Jungen</option><option value="w">Mädchen</option></select></td>
+      <td><button class="x" title="Entfernen">✕</button></td>`;
+    tr.querySelector('.rn').oninput = e => { r.name = e.target.value; save(); };
+    tr.querySelector('.rn').onchange = () => renderResult();
+    tr.querySelector('.rc').onchange = e => { r.cap = Math.max(1, +e.target.value || 1); save(); renderRooms(); };
+    const rg = tr.querySelector('.rg'); rg.value = r.g;
+    rg.onchange = () => { r.g = rg.value; save(); };
+    tr.querySelector('.x').onclick = () => { state.rooms = state.rooms.filter(o => o !== r); save(); renderRooms(); renderResult(); };
+    tb.appendChild(tr);
+  });
+  const beds = state.rooms.reduce((a, r) => a + (+r.cap || 0), 0);
+  const kids = state.students.filter(s => s.name.trim()).length;
+  $('#roomSum').textContent = `${state.rooms.length} Zimmer, ${beds} Betten für ${kids} Kinder`;
+}
+
+/* ---------- Verteilung (Optimierung) ---------- */
+function optimize(){
+  const S = state.students.filter(s => s.name.trim());
+  const R = state.rooms.filter(r => +r.cap > 0);
+  const n = S.length, nR = R.length;
+  if (n < 2) throw new Error('Bitte mindestens 2 Kinder eintragen.');
+  if (!nR) throw new Error('Bitte zuerst Zimmer anlegen (Schritt 3).');
+  const CAP = R.map(r => +r.cap);
+  if (CAP.reduce((a, b) => a + b, 0) < n) throw new Error('Es gibt weniger Betten als Kinder. Bitte Zimmer anpassen.');
+  const idx = new Map(S.map((s, i) => [s.id, i]));
+  const W = S.map(s => s.w.map(id => (id && idx.has(id) && id !== s.id) ? idx.get(id) : -1));
+  const hasW = W.map(w => w.some(x => x >= 0));
+  const G = S.map(s => s.g || ''), RG = R.map(r => r.g || '');
+  const compat = (i, r) => !RG[r] || !G[i] || RG[r] === G[i];
+
+  const score = a => {
+    let t = 0;
+    for (let i = 0; i < n; i++) {
+      if (!hasW[i]) continue;
+      const w = W[i], ri = a[i];
+      let best = -1, cnt = 0;
+      for (let k = 0; k < 3; k++) if (w[k] >= 0 && a[w[k]] === ri) { cnt++; if (best < 0) best = k; }
+      t += best < 0 ? NONE_PENALTY : WISH_POINTS[best] + EXTRA_POINTS * (cnt - 1);
+    }
+    return t;
+  };
+
+  const initial = () => {
+    const occ = new Array(nR).fill(0), a = new Array(n).fill(-1);
+    const order = [...Array(n).keys()].sort(() => Math.random() - 0.5)
+      .sort((x, y) => (G[y] ? 1 : 0) - (G[x] ? 1 : 0));   // Kinder mit Geschlecht zuerst
+    for (const i of order) {
+      let opts = [...Array(nR).keys()].filter(r => occ[r] < CAP[r] && compat(i, r));
+      const exact = opts.filter(r => RG[r] && RG[r] === G[i]);
+      if (exact.length) opts = exact;
+      if (!opts.length) return null;
+      const r = opts[Math.floor(Math.random() * opts.length)];
+      a[i] = r; occ[r]++;
+    }
+    return { a, occ };
+  };
+
+  let best = null, bestScore = -Infinity;
+  const RESTARTS = 14, ITERS = 6000 + n * 900;
+  for (let rs = 0; rs < RESTARTS; rs++) {
+    const init = initial();
+    if (!init) continue;
+    const { a, occ } = init;
+    let cur = score(a);
+    let localBest = a.slice(), localScore = cur;
+    for (let it = 0; it < ITERS; it++) {
+      const T = 60 * Math.pow(0.5 / 60, it / ITERS);
+      const i = Math.floor(Math.random() * n), r = Math.floor(Math.random() * nR), old = a[i];
+      if (r === old || !compat(i, r)) continue;
+      if (occ[r] < CAP[r] && Math.random() < 0.5) {
+        a[i] = r;
+        const ns = score(a);
+        if (ns >= cur || Math.random() < Math.exp((ns - cur) / T)) { cur = ns; occ[old]--; occ[r]++; }
+        else a[i] = old;
+      } else {
+        const members = [];
+        for (let j = 0; j < n; j++) if (a[j] === r) members.push(j);
+        if (!members.length) continue;
+        const j = members[Math.floor(Math.random() * members.length)];
+        if (!compat(j, old)) continue;
+        a[i] = r; a[j] = old;
+        const ns = score(a);
+        if (ns >= cur || Math.random() < Math.exp((ns - cur) / T)) cur = ns;
+        else { a[i] = old; a[j] = r; }
+      }
+      if (cur > localScore) { localScore = cur; localBest = a.slice(); }
+    }
+    if (localScore > bestScore) { bestScore = localScore; best = localBest; }
+  }
+  if (!best) throw new Error('Die Kinder passen nicht in die Zimmer (Jungen/Mädchen-Zimmer prüfen).');
+  const asg = {};
+  S.forEach((s, i) => asg[s.id] = R[best[i]].id);
+  return asg;
+}
+
+function run(){
+  $('#err').textContent = '';
+  $('#busy').textContent = 'Rechne …';
+  selected = null;
+  setTimeout(() => {
+    try {
+      state.result = optimize();
+      save(); renderResult();
+      $('#resultSec').scrollIntoView({ behavior: 'smooth' });
+    } catch (e) { $('#err').textContent = e.message; }
+    $('#busy').textContent = '';
+  }, 30);
+}
+$('#go').onclick = () => {
+  if (!state.rooms.length) autoRooms();
+  run();
+};
+$('#again').onclick = run;
+
+/* ---------- Ergebnis ---------- */
+function wishInfo(s, asg){
+  const ws = s.w.map(id => (id && byId(id) && id !== s.id) ? id : null);
+  const hit = ws.map(id => id ? asg[id] === asg[s.id] : null);
+  const best = hit.findIndex(h => h === true);
+  const any = ws.some(Boolean);
+  return { ws, hit, best, cls: !any ? '' : best < 0 ? 'w0' : 'w' + (best + 1) };
+}
+
+function renderResult(){
+  const sec = $('#resultSec');
+  const asg = state.result;
+  const S = state.students.filter(s => s.name.trim());
+  if (!asg || !S.length) { sec.hidden = true; return; }
+  sec.hidden = false;
+  const missing = S.some(s => !asg[s.id] || !roomById(asg[s.id]));
+  if (missing) {
+    $('#stats').innerHTML = '<div class="err">Kinder oder Zimmer wurden geändert – bitte neu verteilen.</div>';
+    $('#resultRooms').innerHTML = ''; $('#overview').innerHTML = '';
+    return;
+  }
+  const info = new Map(S.map(s => [s.id, wishInfo(s, asg)]));
+  const c = [0, 0, 0, 0];
+  info.forEach(x => { if (x.cls) c[x.best < 0 ? 3 : x.best]++; });
+  $('#stats').innerHTML = `
+    <div class="stat s1"><b>${c[0]}</b>1. Wunsch</div>
+    <div class="stat s2"><b>${c[1]}</b>2. Wunsch</div>
+    <div class="stat s3"><b>${c[2]}</b>3. Wunsch</div>
+    <div class="stat s0"><b>${c[3]}</b>ohne Wunsch</div>`;
+
+  const grid = $('#resultRooms');
+  grid.innerHTML = '';
+  state.rooms.forEach(r => {
+    const members = S.filter(s => asg[s.id] === r.id).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    const card = document.createElement('div');
+    card.className = 'room';
+    const gl = r.g === 'm' ? ' · Jungen' : r.g === 'w' ? ' · Mädchen' : '';
+    card.innerHTML = `<h3>${esc(r.name)}<small>${members.length}/${r.cap}${gl}</small></h3>`;
+    members.forEach(s => {
+      const x = info.get(s.id);
+      const all = x.hit.filter(Boolean).length;
+      const badge = !x.cls ? '' : x.best < 0 ? '✕ kein Wunsch' : `${x.best + 1}. Wunsch${all > 1 ? ` (+${all - 1})` : ''}`;
+      const chip = document.createElement('div');
+      chip.className = `chip ${x.cls}${selected === s.id ? ' sel' : ''}`;
+      chip.title = 'Wünsche: ' + x.ws.map((id, k) => id ? `${k + 1}. ${byId(id).name} ${x.hit[k] ? '✓' : '✗'}` : `${k + 1}. –`).join(', ');
+      chip.innerHTML = `<span>${esc(s.name)}</span><span class="badge">${badge}</span>`;
+      chip.onclick = () => clickChild(s.id);
+      card.appendChild(chip);
+    });
+    for (let k = members.length; k < r.cap; k++) {
+      const f = document.createElement('div');
+      f.className = 'free noprint';
+      f.textContent = selected ? '→ hierher verschieben' : 'freier Platz';
+      f.onclick = () => moveTo(r.id);
+      card.appendChild(f);
+    }
+    grid.appendChild(card);
+  });
+
+  const cell = (s, k) => {
+    const x = info.get(s.id), id = x.ws[k];
+    if (!id) return '<td class="no">–</td>';
+    return `<td>${x.hit[k] ? '<span class="ok">✓</span>' : '<span class="no">✗</span>'} ${esc(byId(id).name)}</td>`;
+  };
+  $('#overview').innerHTML = '<tr><th>Kind</th><th>Zimmer</th><th class="th1">1. Wunsch</th><th class="th2">2. Wunsch</th><th class="th3">3. Wunsch</th></tr>' +
+    [...S].sort((a, b) => a.name.localeCompare(b.name, 'de')).map(s =>
+      `<tr><td>${esc(s.name)}</td><td>${esc(roomById(asg[s.id]).name)}</td>${cell(s, 0)}${cell(s, 1)}${cell(s, 2)}</tr>`).join('');
+}
+
+function clickChild(id){
+  if (!selected) { selected = id; }
+  else if (selected === id) { selected = null; }
+  else {
+    const a = state.result, ra = a[selected], rb = a[id];
+    if (ra !== rb) { a[selected] = rb; a[id] = ra; save(); }
+    selected = null;
+  }
+  renderResult();
+}
+function moveTo(roomId){
+  if (!selected) return;
+  state.result[selected] = roomId;
+  selected = null; save(); renderResult();
+}
+
+/* ---------- Speichern ---------- */
+$('#exportBtn').onclick = () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'zimmerverteilung.json'; a.click();
+};
+$('#importBtn').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!Array.isArray(d.students)) throw 0;
+    state = { students: d.students, rooms: d.rooms || [], result: d.result || null };
+    save(); renderAll();
+  } catch (_) { alert('Die Datei konnte nicht gelesen werden.'); }
+  e.target.value = '';
+};
+$('#clearAll').onclick = () => {
+  if (!confirm('Wirklich alle Kinder, Wünsche und Zimmer löschen?')) return;
+  state = { students: [], rooms: [], result: null }; save(); renderAll();
+};
+
+function renderAll(){ renderStudents(); renderRooms(); renderResult(); }
+renderAll();
+</script>
+</body>
+</html>
