@@ -57,6 +57,9 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
 .free:hover{border-color:var(--accent);color:var(--accent)}
 .ok{color:var(--w1);font-weight:700} .no{color:var(--muted)}
 #overview td,#overview th{border-bottom:1px solid var(--line);padding:6px 5px}
+.alert{border:2px solid var(--w0);background:color-mix(in srgb,var(--w0) 12%,var(--card));border-radius:12px;padding:14px 16px;margin:4px 0 16px}
+.alert-title{color:var(--w0);font-weight:700;font-size:17px;margin-bottom:6px}
+.alert ul{margin:6px 0 8px;padding-left:22px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:12px}
 .legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;background:var(--c)}
 .muted{color:var(--muted)}
@@ -129,6 +132,7 @@ details summary{cursor:pointer;color:var(--accent);margin:12px 0 6px}
 
   <section id="resultSec" hidden>
     <h2>Ergebnis</h2>
+    <div class="alert" id="alertBox" hidden></div>
     <div class="stats" id="stats"></div>
     <div class="legend noprint">
       <span style="--c:var(--w1)">1. Wunsch erfüllt</span>
@@ -560,6 +564,7 @@ function renderResult(){
   sec.hidden = false;
   const missing = S.some(s => !asg[s.id] || !roomById(asg[s.id]));
   if (missing) {
+    $('#alertBox').hidden = true;
     $('#stats').innerHTML = '<div class="err">Kinder oder Zimmer wurden geändert – bitte neu verteilen.</div>';
     $('#resultRooms').innerHTML = ''; $('#overview').innerHTML = '';
     return;
@@ -573,10 +578,13 @@ function renderResult(){
     <div class="stat s3"><b>${c[2]}</b>3. Wunsch</div>
     <div class="stat s0"><b>${c[3]}</b>ohne Wunsch</div>`;
   const lost = S.filter(s => info.get(s.id).cls === 'w0');
-  if (lost.length) $('#stats').innerHTML += `<div class="muted" style="width:100%">
-    Ohne Wunsch: ${lost.map(s => `<b>${esc(s.name)}</b> (wollte ${info.get(s.id).ws.filter(Boolean).map(id => esc(byId(id).name)).join(', ')})`).join('; ')}.
-    Die Seite hat sehr viele Möglichkeiten durchprobiert – diese Wunschkinder sind so gefragt, dass sonst ein anderes Kind leer ausgehen würde.
-    Tipp: Zimmer mit einem Bett mehr anlegen oder das Kind nach weiteren Wünschen fragen.</div>`;
+  $('#alertBox').hidden = !lost.length;
+  if (lost.length) $('#alertBox').innerHTML = `
+    <div class="alert-title">⚠ Es geht nicht, dass jedes Kind einen Wunsch im Zimmer hat</div>
+    <div>${lost.length === 1 ? 'Dieses Kind ist' : `Diese ${lost.length} Kinder sind`} mit <b>keinem</b> Wunschkind im Zimmer:</div>
+    <ul>${lost.map(s => `<li><b>${esc(s.name)}</b> – wollte ${info.get(s.id).ws.filter(Boolean).map(id => esc(byId(id).name)).join(', ')}</li>`).join('')}</ul>
+    <div>Die Seite hat sehr viele Möglichkeiten durchprobiert: Diese Wunschkinder sind so gefragt, dass sonst andere Kinder leer ausgehen würden.
+    <b>Tipp:</b> Zimmer mit einem Bett mehr anlegen oder ${lost.length === 1 ? 'das Kind' : 'die Kinder'} nach weiteren Wünschen fragen.</div>`;
   const alone = state.rooms.map(r => S.filter(s => asg[s.id] === r.id)).filter(m => m.length === 1);
   if (alone.length) $('#stats').innerHTML += `<div class="err" style="width:100%">Achtung: ${alone.map(m => esc(m[0].name)).join(', ')} ist allein im Zimmer.
     Zieh ein anderes Kind dazu oder klick „Zimmer automatisch anlegen“ und verteile neu.</div>`;
